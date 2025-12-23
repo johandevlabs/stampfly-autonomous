@@ -18,6 +18,9 @@ This project is intentionally educational, inspired by PX4/ArduPilot concepts bu
 ## Documentation
 
 - [Repository structure & design rationale](docs/repo_structure.md)
+- [Repository architecture](docs/architecture.md)
+- [Control loops](docs/control_loops.md)
+- [Safety model](docs/safety_model.md)
 
 
 ---
