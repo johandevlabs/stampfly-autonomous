@@ -268,6 +268,15 @@ The system is designed to grow in phases:
 
 ---
 
+## Sensors
+
+SPI configuration (StampFly):
+- BMI270: SPI MODE0, 1 MHz, CS=GPIO46
+- PMW3901: SPI MODE0, 1 MHz, CS=GPIO12
+(verified during Phase 0 bring-up)
+
+---
+
 ## Final Notes
 
 This architecture is successful when it feels:
