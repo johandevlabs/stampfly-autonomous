@@ -10,6 +10,12 @@ This project is intentionally educational, inspired by PX4/ArduPilot concepts bu
 
 ---
 
+## Documentation
+- [Repository structure & design rationale](docs/repo_structure.md)
+
+
+---
+
 ## System Architecture
 
 ### On-Drone Responsibilities
