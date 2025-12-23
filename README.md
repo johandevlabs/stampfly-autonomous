@@ -10,7 +10,13 @@ This project is intentionally educational, inspired by PX4/ArduPilot concepts bu
 
 ---
 
+> This repository follows a documented architecture.
+> Start with `docs/architecture.md`.
+
+---
+
 ## Documentation
+
 - [Repository structure & design rationale](docs/repo_structure.md)
 
 
