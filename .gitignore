@@ -1,5 +1,6 @@
 .pio/
 .vscode/
+external/
 .DS_Store
 *.log
 *.csv

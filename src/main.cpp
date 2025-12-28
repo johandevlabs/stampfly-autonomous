@@ -4,6 +4,7 @@
 #include "board/board_init.h"
 #include "utils/loop_stats.h"
 #include "board/spi_probe.h"
+#include "sensors/imu/imu_bmi270.h"
 
 // Phase 0 loop targets
 static constexpr uint32_t FAST_HZ = 250;   // e.g. IMU later
@@ -18,6 +19,10 @@ static LoopStats fast_stats;
 static LoopStats slow_stats;
 static uint32_t last_report_us = 0;
 
+// Sensors
+static ImuBmi270 g_imu;
+
+
 void setup() {
   Serial.begin(115200);
   delay(2500);
@@ -30,7 +35,10 @@ void setup() {
   scan.i2c_ok = init.i2c_ok;
   scan.spi_ok = init.spi_ok;
   board_print_report(scan);
-  spi_probe_devices();
+  //spi_probe_devices();
+
+  // bring up IMU BMI270
+  g_imu.begin();
 
   // Init timing stats
   fast_stats.reset();
@@ -71,6 +79,16 @@ void loop() {
                   (unsigned long)slow_stats.avg_dt_us(),
                   (unsigned long)slow_stats.max_dt_us());
   }
+
+  static uint32_t last_imu_print_ms = 0;
+  ImuSample s;
+
+  if (g_imu.readFRU(s) && (millis() - last_imu_print_ms) >= 1000 ) {
+    last_imu_print_ms = millis();
+    Serial.printf("[imu raw] acc=%.3f %.3f %.3f  gyr=%.3f %.3f %.3f\n",
+                    s.ax, s.ay, s.az, s.gx, s.gy, s.gz);
+  }
+
 
   // Avoid starving Wi-Fi/RTOS housekeeping in future; safe to yield here.
   delay(1);

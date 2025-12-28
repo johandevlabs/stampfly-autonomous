@@ -1,15 +1,24 @@
 #pragma once
-#include <stdint.h>
+#include <Arduino.h>
 
 struct ImuSample {
-  float gx_dps = 0, gy_dps = 0, gz_dps = 0;
-  float ax_g = 0, ay_g = 0, az_g = 0;
-  uint32_t t_us = 0;
-  bool valid = false;
+  float ax, ay, az;  // m/s^2 (or g if you prefer; we’ll document once confirmed)
+  float gx, gy, gz;  // rad/s (or dps)
+  uint32_t t_us;
+  bool valid;
 };
 
 class ImuBmi270 {
- public:
+public:
   bool begin();
-  bool read(ImuSample& out);
+  bool readFRU(ImuSample &out); // returns in FRU frame
+
+private:
+  //static bool _read_raw_sample(float &x, float &y, float &z);
+  bool read(ImuSample &out); // returns in BMI270s default frame
+  bool calibrate_gyro();
+  bool _ok = false;
+  float _gyro_bias_x =0;
+  float _gyro_bias_y =0;
+  float _gyro_bias_z =0;
 };
