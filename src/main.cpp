@@ -5,6 +5,7 @@
 #include "utils/loop_stats.h"
 #include "board/spi_probe.h"
 #include "sensors/imu/imu_bmi270.h"
+#include "sensors/flow/flow_pmw3901.h"
 
 // Phase 0 loop targets
 static constexpr uint32_t FAST_HZ = 250;   // e.g. IMU later
@@ -13,7 +14,7 @@ static constexpr uint32_t REPORT_HZ = 1;
 
 static constexpr uint32_t FAST_PERIOD_US   = 1000000UL / FAST_HZ;
 static constexpr uint32_t SLOW_PERIOD_US   = 1000000UL / SLOW_HZ;
-static constexpr uint32_t REPORT_PERIOD_US = 1000000UL / REPORT_HZ;
+static constexpr uint32_t REPORT_PERIOD_US = 5000000UL / REPORT_HZ;
 
 static LoopStats fast_stats;
 static LoopStats slow_stats;
@@ -21,6 +22,7 @@ static uint32_t last_report_us = 0;
 
 // Sensors
 static ImuBmi270 g_imu;
+static FlowPmw3901 g_flow;
 
 
 void setup() {
@@ -39,6 +41,9 @@ void setup() {
 
   // bring up IMU BMI270
   g_imu.begin();
+
+  // bring up Flow PMW3901
+  g_flow.begin();
 
   // Init timing stats
   fast_stats.reset();
@@ -83,12 +88,19 @@ void loop() {
   static uint32_t last_imu_print_ms = 0;
   ImuSample s;
 
-  if (g_imu.readFRU(s) && (millis() - last_imu_print_ms) >= 1000 ) {
+  if (g_imu.readFRU(s) && (millis() - last_imu_print_ms) >= 5000 ) {
     last_imu_print_ms = millis();
-    Serial.printf("[imu raw] acc=%.3f %.3f %.3f  gyr=%.3f %.3f %.3f\n",
+    Serial.printf("[imu SI] acc=%.3f %.3f %.3f  gyr=%.3f %.3f %.3f\n",
                     s.ax, s.ay, s.az, s.gx, s.gy, s.gz);
   }
 
+  static uint32_t last_flow_print_ms = 0;
+  FlowSample fs;
+  if (g_flow.read(fs) && (millis() - last_flow_print_ms) >= 1000 ) {
+    last_flow_print_ms = millis();
+    Serial.printf("[flow raw] dx= %.3f dy= %.3f motion= %u quality= %u\n",
+              fs.dx, fs.dy, (unsigned)fs.motion, (unsigned)fs.quality);
+  }
 
   // Avoid starving Wi-Fi/RTOS housekeeping in future; safe to yield here.
   delay(1);

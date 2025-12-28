@@ -24,8 +24,8 @@ static const SPISettings SPI_BMI270_SETTINGS(
 
 // PMW3901 optical flow
 static constexpr int PIN_CS_PMW3901 = 12;
-static const SPISettings SPI_PMW3901_SETTINGS(
-    8000000,      // 1 MHz
+static const SPISettings SPI_PMW3901_SETTINGS( 
+    1000000,      // 1 MHz
     MSBFIRST,
-    SPI_MODE0
+    SPI_MODE3
 );
