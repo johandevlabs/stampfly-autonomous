@@ -78,7 +78,7 @@ bool ImuBmi270::begin()
   pinMode(PIN_CS_BMI270, OUTPUT);
   digitalWrite(PIN_CS_BMI270, HIGH);
 
-  delay(200);
+  delay(100);
 
   // SPI pins are already set in board_init(): board_spi_begin(44,43,14,-1)
   // (so we don't call SPI.begin() here unless you want to make it standalone)
@@ -96,6 +96,8 @@ bool ImuBmi270::begin()
 
   // REQUIRED for BMI270 over SPI
   g_dev.dummy_byte = 1;
+
+  delay(200);
 
   int8_t rslt = bmi270_init(&g_dev);
   if (rslt != BMI2_OK) {
