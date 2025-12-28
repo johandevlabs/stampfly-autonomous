@@ -9,50 +9,76 @@ static bmi2_dev g_dev;
 static Bmi270SpiIntf g_intf;
 
 // --- Helper functions --- //
-static bool read_raw_sample(float &gx, float &gy, float &gz)
+static bool read_raw_sample(float &ax, float &ay, float &az,
+                            float &gx, float &gy, float &gz)
 {
   bmi2_sens_data data = {0};
   int8_t rslt = bmi2_get_sensor_data(&data, &g_dev);
   if (rslt != BMI2_OK) return false;
 
-  // convert raw -> rad/s using your current range
+  // Convert raw -> SI using your configured ranges
   constexpr float INV_32768 = 1.0f / 32768.0f;
   constexpr float DEG2RAD = 3.14159265358979323846f / 180.0f;
-  constexpr float GYR_RANGE_DPS = 2000.0f;  // match your configured range
+  constexpr float G = 9.80665f;
+
+  constexpr float ACC_RANGE_G = 4.0f;        // match your config
+  constexpr float GYR_RANGE_DPS = 2000.0f;   // match your config
+
+  ax = (data.acc.x * INV_32768) * (ACC_RANGE_G * G);
+  ay = (data.acc.y * INV_32768) * (ACC_RANGE_G * G);
+  az = (data.acc.z * INV_32768) * (ACC_RANGE_G * G);
 
   gx = (data.gyr.x * INV_32768) * (GYR_RANGE_DPS * DEG2RAD);
   gy = (data.gyr.y * INV_32768) * (GYR_RANGE_DPS * DEG2RAD);
   gz = (data.gyr.z * INV_32768) * (GYR_RANGE_DPS * DEG2RAD);
+
   return true;
 }
 
 bool ImuBmi270::calibrate_gyro()
 {
-  // Simple gyro bias calibration: keep the drone still during this
-  constexpr int N = 500;
+  // Keep drone still during this
+  constexpr int N = 500;               // target samples (~2s at 250 Hz)
+  constexpr int MIN_OK = 350;          // require enough "still" samples
+  constexpr float G = 9.80665f;
+
+  // Gating thresholds
+  constexpr float GYRO_MAX_RAD_S = 0.15f;     // ~8.6 deg/s
+  constexpr float ACC_MAG_TOL = 0.5f;         // m/s^2 tolerance around |g|
+
   float bgx = 0, bgy = 0, bgz = 0;
   int n_ok = 0;
 
   for (int i = 0; i < N; i++) {
-    float gx, gy, gz;
-    if (read_raw_sample(gx, gy, gz)) {
-      bgx += gx; bgy += gy; bgz += gz;
-      n_ok++;
+    float ax, ay, az, gx, gy, gz;
+    if (read_raw_sample(ax, ay, az, gx, gy, gz)) {
+
+      const float gmag = sqrtf(gx*gx + gy*gy + gz*gz);
+      const float amag = sqrtf(ax*ax + ay*ay + az*az);
+
+      const bool still_gyro = (gmag < GYRO_MAX_RAD_S);
+      const bool still_acc  = (fabsf(amag - G) < ACC_MAG_TOL);
+
+      if (still_gyro && still_acc) {
+        bgx += gx; bgy += gy; bgz += gz;
+        n_ok++;
+      }
     }
-    delay(4);
+    delay(4); // ~250 Hz pacing
   }
 
-  if (n_ok > 0) {
+  if (n_ok >= MIN_OK) {
     _gyro_bias_x = bgx / n_ok;
     _gyro_bias_y = bgy / n_ok;
     _gyro_bias_z = bgz / n_ok;
-    Serial.printf("[imu] gyro bias rad/s: %.6f %.6f %.6f (n=%d)\n",
-                  _gyro_bias_x, _gyro_bias_y, _gyro_bias_z, n_ok);
+
+    Serial.printf("[imu] gyro bias rad/s: %.6f %.6f %.6f (n=%d/%d)\n",
+                  _gyro_bias_x, _gyro_bias_y, _gyro_bias_z, n_ok, N);
     return true;
-  } else {
-    Serial.println("[imu] gyro bias calibration failed!");
-    return false;
   }
+
+  Serial.printf("[imu] gyro bias calibration rejected: n_ok=%d/%d (keep old bias)\n", n_ok, N);
+  return false;
 }
 
 static inline void mapSensorToFRU(ImuSample &s)
@@ -75,10 +101,6 @@ static inline void mapSensorToFRU(ImuSample &s)
 bool ImuBmi270::begin()
 {
   Serial.println("[imu] begin started!");
-  pinMode(PIN_CS_BMI270, OUTPUT);
-  digitalWrite(PIN_CS_BMI270, HIGH);
-
-  delay(100);
 
   // SPI pins are already set in board_init(): board_spi_begin(44,43,14,-1)
   // (so we don't call SPI.begin() here unless you want to make it standalone)
@@ -97,19 +119,20 @@ bool ImuBmi270::begin()
   // REQUIRED for BMI270 over SPI
   g_dev.dummy_byte = 1;
 
-  delay(200);
-
   int8_t rslt = bmi270_init(&g_dev);
   if (rslt != BMI2_OK) {
     Serial.printf("[imu] bmi270_init failed: %d\n", rslt);
     _ok = false;
     return false;
   }
+  delay(10);
 
   // Sanity: read chip-id via Bosch
   uint8_t id = 0;
   (void)bmi2_get_regs(BMI2_CHIP_ID_ADDR, &id, 1, &g_dev);
   Serial.printf("[imu] chip id = 0x%02X (expect 0x24)\n", id);
+
+  delay(10);
 
   // Configure accel + gyro
   bmi2_sens_config cfg[2];
@@ -156,7 +179,7 @@ bool ImuBmi270::begin()
     return false;
   }
 
-  delay(100);   // allow sensors to exit suspend and settle
+  delay(10);   // allow sensors to exit suspend and settle
 
   // Calibrate BMI270 gyro
   calibrate_gyro();

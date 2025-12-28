@@ -1,10 +1,22 @@
 #include "board_init.h"
+#include "config/spi_config.h"
 
 BoardBringupReport board_init() {
   BoardBringupReport r;
 
   r.i2c_ok = board_i2c_begin_with_pins(3, 4, 400000);
   r.spi_ok = board_spi_begin(44, 43, 14, -1);
+
+  // Make sure all SPI devices are deselected BEFORE SPI starts
+  pinMode(PIN_CS_BMI270, OUTPUT);
+  digitalWrite(PIN_CS_BMI270, HIGH);
+
+  pinMode(PIN_CS_PMW3901, OUTPUT);
+  digitalWrite(PIN_CS_PMW3901, HIGH);
+  
+  // (Add any other SPI CS pins here)
+
+  delay(5);
 
   return r;
 }
