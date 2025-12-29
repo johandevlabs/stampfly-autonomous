@@ -1,10 +1,11 @@
 #include "board_init.h"
 #include "config/spi_config.h"
+#include "config/pins.h"
 
 BoardBringupReport board_init() {
   BoardBringupReport r;
 
-  r.i2c_ok = board_i2c_begin_with_pins(3, 4, 400000);
+  r.i2c_ok = board_i2c_begin_with_pins(PIN_I2C_SDA, PIN_I2C_SCL, I2C_FREQ);
   r.spi_ok = board_spi_begin(44, 43, 14, -1);
 
   // Make sure all SPI devices are deselected BEFORE SPI starts
@@ -16,7 +17,16 @@ BoardBringupReport board_init() {
   
   // (Add any other SPI CS pins here)
 
-  delay(5);
+  // TOF-sensors: Hold both sensors in reset at boot (Phase 0 deterministic)
+  pinMode(PIN_TOF1_XSHUT, OUTPUT);
+  pinMode(PIN_TOF2_XSHUT, OUTPUT);
+  digitalWrite(PIN_TOF1_XSHUT, LOW);
+  digitalWrite(PIN_TOF2_XSHUT, LOW);
+  delay(20);
+
+  // Optional: data-ready pins as inputs
+  pinMode(PIN_TOF1_GPIO1, INPUT);
+  pinMode(PIN_TOF2_GPIO1, INPUT);
 
   return r;
 }
