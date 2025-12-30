@@ -162,10 +162,10 @@ void setup() {
   board_print_report(scan);
 
   // temp - delete when done
-  delay(100);
-  probe_bmm150_like(0x10);
-  delay(100);
-  probe_i2c_devices();
+  //delay(100);
+  //probe_bmm150_like(0x10);
+  //delay(100);
+  //probe_i2c_devices();
 
   // Init timing stats
   fast_stats.reset();
