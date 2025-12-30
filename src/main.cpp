@@ -7,10 +7,8 @@
 #include "board/board_init.h"
 #include "board/spi_probe.h"
 
-#include "sensors/imu/imu_bmi270.h"
-#include "sensors/flow/flow_pmw3901.h"
-#include "sensors/tof/tof_vl53l3.h"
-#include "sensors/power/power_ina3221.h"
+#include "sensors/sensors.h"
+
 
 // Phase 0 loop targets
 static constexpr uint32_t FAST_HZ = 250;   // e.g. IMU later
@@ -26,54 +24,26 @@ static LoopStats slow_stats;
 static uint32_t last_report_us = 0;
 
 // Sensors
-static ImuBmi270 g_imu;
-static FlowPmw3901 g_flow;
-static TofVl53L3 g_tof_down;
-static TofVl53L3 g_tof_front;
-TofPins downPins(PIN_TOF1_XSHUT, PIN_TOF1_GPIO1);
-TofPins frontPins(PIN_TOF2_XSHUT, PIN_TOF2_GPIO1);
-static PowerINA3221 g_powerMon;
+static Sensors g_sensors;
 
 
 void setup() {
   Serial.begin(115200);
   delay(2500);
-  Serial.println();
   Serial.println("StampFly Phase 0 bring-up starting...");
 
   // Init I2C and SPI then scan and print report
   auto init = board_init();
   //spi_probe_devices();
 
-  // bring up IMU BMI270
-  g_imu.begin();
+  // Bring up all sensors (Wire is already initialized in board_init())
+  bool sensors_ok = g_sensors.begin(Wire);
 
-  // bring up Flow PMW3901
-  g_flow.begin();
-
-  // bring up TOF VL53L3 sensors (ToFs are already held LOW by board_init())
-  g_tof_down.begin(downPins, TOF_ADDR8_DOWN, TOF_ADDR7_DOWN);
-  //g_tof_front.begin(frontPins, TOF_ADDR8_FRONT, TOF_ADDR7_FRONT);
-  g_tof_down.start_ranging();
-  //g_tof_front.start_ranging();
-
-  // bring up Power mon. INA3221
-  bool powerMon_ok = g_powerMon.begin(Wire, 0x40, 0.01f);
-  Serial.printf("[power] INA3221 begin: %s\n", powerMon_ok ? "OK" : "FAIL");
-  
+  // Run a final i2c scan and print results  
   auto scan = board_i2c_scan(Wire);
   scan.i2c_ok = init.i2c_ok;
   scan.spi_ok = init.spi_ok;
   board_print_report(scan);
-
-  // Blink led
-  /*pinMode(39, OUTPUT);
-  digitalWrite(PIN_TOF1_XSHUT, LOW);
-  delay(100);
-  digitalWrite(PIN_TOF1_XSHUT, HIGH);
-  delay(300);
-  digitalWrite(PIN_TOF1_XSHUT, LOW);*/
-
 
   // Init timing stats
   fast_stats.reset();
@@ -88,87 +58,41 @@ void loop() {
   // Fast loop placeholder (later: IMU read)
   if (fast_stats.ready(now, FAST_PERIOD_US)) {
     fast_stats.tick(now);
-    
-    // IMU read
-    ImuSample s;
-    g_imu.readFRU(s);
-  
-    // Flow read
-    FlowSample fs;
-    g_flow.read(fs);
+
+    // Read 'fast' sensors    
+    g_sensors.fast_read();
+
   }
 
   // Slow loop placeholder (later: ToF read)
   if (slow_stats.ready(now, SLOW_PERIOD_US)) {
     slow_stats.tick(now);
 
-    // TOF read
-    TofSample down, front;
-    g_tof_down.read(down);
-    //g_tof_front.read(front);
+    // Read 'slow' sensors
+    g_sensors.slow_read();
+
   }
 
   // 1 Hz report of dt jitter
   if ((uint32_t)(now - last_report_us) >= REPORT_PERIOD_US) {
     last_report_us = now;
 
+    // Update very slow sensors (power)
+    g_sensors.very_slow_read();
+    g_sensors.printSample();
+
     // Print timing stats
     Serial.printf("[timing] fast(%u Hz): samples=%lu min=%luus avg=%luus max=%luus\n",
-                  (unsigned)FAST_HZ,
-                  (unsigned long)fast_stats.samples(),
-                  (unsigned long)fast_stats.min_dt_us(),
-                  (unsigned long)fast_stats.avg_dt_us(),
+                  (unsigned)FAST_HZ, (unsigned long)fast_stats.samples(),
+                  (unsigned long)fast_stats.min_dt_us(), (unsigned long)fast_stats.avg_dt_us(),
                   (unsigned long)fast_stats.max_dt_us());
-
-    Serial.printf("[timing] slow(%u Hz): samples=%lu min=%luus avg=%luus max=%luus\n",
-                  (unsigned)SLOW_HZ,
-                  (unsigned long)slow_stats.samples(),
-                  (unsigned long)slow_stats.min_dt_us(),
-                  (unsigned long)slow_stats.avg_dt_us(),
-                  (unsigned long)slow_stats.max_dt_us());
     
-    // Print IMU sample
-    ImuSample imu_s;
-    g_imu.readFRU(imu_s);
-    Serial.printf("[imu SI] acc=%.3f %.3f %.3f  gyr=%.3f %.3f %.3f\n", 
-                  imu_s.ax, imu_s.ay, imu_s.az, imu_s.gx, imu_s.gy, imu_s.gz);
-
-    // Print Flow sample
-    FlowSample flow_s;
-    g_flow.read(flow_s);
-    Serial.printf("[flow raw] dx= %.3f dy= %.3f motion= %u quality= %u\n",
-                  flow_s.dx, flow_s.dy, (unsigned)flow_s.motion, (unsigned)flow_s.quality);
-
-    // Print TOF sample
-    TofSample down, front;
-    g_tof_down.read(down);
-    auto print_one = [](const char *name, const TofSample &s) {
-      if (!s.valid) {
-        Serial.printf("%s=-- ", name);
-        return;
-      }
-      if (s.stale) {
-        Serial.printf("%s=%u mm* ", name, s.range_mm);
-      } else {
-        Serial.printf("%s=%u mm (st=%u) ", name, s.range_mm, s.range_status);
-      }
-    };
-
-    Serial.print("[tof] ");
-    print_one("down", down);
-    //print_one("front", front);
-    Serial.println();
-
-    // Read and print Power sample
-    PowerSample power_s = g_powerMon.read();
-    if (!power_s.valid) {
-      Serial.printf("[power] INVALID (err=%lu)\n", (unsigned long)g_powerMon.errorCount());
-      return;
-    }
-    Serial.printf("[power] VBAT_IN=%.3f V  I=%.3f A  P=%.3f W\n", 
-                  power_s.vbat_in_v, power_s.ishunt_a, power_s.p_w);
+    Serial.printf("[timing] slow(%u Hz): samples=%lu min=%luus avg=%luus max=%luus\n",
+                  (unsigned)SLOW_HZ, (unsigned long)slow_stats.samples(),
+                  (unsigned long)slow_stats.min_dt_us(), (unsigned long)slow_stats.avg_dt_us(),
+                  (unsigned long)slow_stats.max_dt_us());
   }
-
+  
   // Avoid starving Wi-Fi/RTOS housekeeping in future; safe to yield here.
   delay(1);
 }
