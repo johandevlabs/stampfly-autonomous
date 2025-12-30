@@ -100,7 +100,7 @@ static inline void mapSensorToFRU(ImuSample &s)
 // --- Core functions --- //
 bool ImuBmi270::begin()
 {
-  Serial.println("[imu] begin started!");
+  //Serial.println("[imu] begin started!");
 
   // SPI pins are already set in board_init(): board_spi_begin(44,43,14,-1)
   // (so we don't call SPI.begin() here unless you want to make it standalone)
@@ -121,7 +121,7 @@ bool ImuBmi270::begin()
 
   int8_t rslt = bmi270_init(&g_dev);
   if (rslt != BMI2_OK) {
-    Serial.printf("[imu] bmi270_init failed: %d\n", rslt);
+    //Serial.printf("[imu] bmi270_init failed: %d\n", rslt);
     _ok = false;
     return false;
   }
@@ -130,7 +130,7 @@ bool ImuBmi270::begin()
   // Sanity: read chip-id via Bosch
   uint8_t id = 0;
   (void)bmi2_get_regs(BMI2_CHIP_ID_ADDR, &id, 1, &g_dev);
-  Serial.printf("[imu] chip id = 0x%02X (expect 0x24)\n", id);
+  //Serial.printf("[imu] chip id = 0x%02X (expect 0x24)\n", id);
 
   delay(10);
 
@@ -141,7 +141,7 @@ bool ImuBmi270::begin()
 
   rslt = bmi2_get_sensor_config(cfg, 2, &g_dev);
   if (rslt != BMI2_OK) {
-    Serial.printf("[imu] get_sensor_config failed: %d\n", rslt);
+    //Serial.printf("[imu] get_sensor_config failed: %d\n", rslt);
     _ok = false;
     return false;
   }
@@ -159,7 +159,7 @@ bool ImuBmi270::begin()
 
   rslt = bmi2_set_sensor_config(cfg, 2, &g_dev);
   if (rslt != BMI2_OK) {
-    Serial.printf("[imu] set_sensor_config failed: %d\n", rslt);
+    //Serial.printf("[imu] set_sensor_config failed: %d\n", rslt);
     _ok = false;
     return false;
   }
@@ -168,13 +168,13 @@ bool ImuBmi270::begin()
   uint8_t sens_list[2] = { BMI2_ACCEL, BMI2_GYRO };
   rslt = bmi2_sensor_enable(sens_list, 2, &g_dev);
   if (rslt != BMI2_OK) {
-    Serial.printf("[imu] sensor_enable failed: %d\n", rslt);
+    //Serial.printf("[imu] sensor_enable failed: %d\n", rslt);
     _ok = false;
     return false;
   }
 
   if (rslt != BMI2_OK) {
-    Serial.printf("[imu] sensor_enable failed: %d\n", rslt);
+    //Serial.printf("[imu] sensor_enable failed: %d\n", rslt);
     _ok = false;
     return false;
   }
@@ -185,7 +185,7 @@ bool ImuBmi270::begin()
   calibrate_gyro();
   
   _ok = true;
-  Serial.println("[imu] BMI270 initialized (Bosch driver)");
+  //Serial.println("[imu] BMI270 initialized (Bosch driver)");
   return true;
   
 }
