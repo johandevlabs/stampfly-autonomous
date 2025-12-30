@@ -26,6 +26,122 @@ static uint32_t last_report_us = 0;
 // Sensors
 static Sensors g_sensors;
 
+// temp helper functions - delete when done
+static bool i2c_read_u8(uint8_t addr, uint8_t reg, uint8_t &value)
+{
+  Wire.beginTransmission(addr);
+  Wire.write(reg);
+  if (Wire.endTransmission(false) != 0) {
+    return false;
+  }
+
+  if (Wire.requestFrom(addr, (uint8_t)1) != 1) {
+    return false;
+  }
+
+  value = Wire.read();
+  return true;
+}
+
+void probe_i2c_devices()
+{
+  uint8_t id;
+
+  Serial.println("=== I2C chip ID probe ===");
+
+  // ---- BMP280 / BME280 @ 0x76 ----
+  if (i2c_read_u8(0x76, 0xD0, id)) {
+    Serial.printf("[0x76] chip ID = 0x%02X", id);
+    if (id == 0x58) {
+      Serial.println(" -> BMP280");
+    } else if (id == 0x60) {
+      Serial.println(" -> BME280");
+    } else {
+      Serial.println(" -> unknown (but alive)");
+    }
+  } else {
+    Serial.println("[0x76] no response");
+  }
+
+  // ---- BMM150 @ 0x10 ----
+  if (i2c_read_u8(0x10, 0x40, id)) {
+    Serial.printf("[0x10] chip ID = 0x%02X", id);
+    if (id == 0x32) {
+      Serial.println(" -> BMM150");
+    } else {
+      Serial.println(" -> unexpected ID");
+    }
+  } else {
+    Serial.println("[0x10] no response");
+  }
+
+  Serial.println("=========================");
+}
+
+static bool i2c_read_u8_rs(uint8_t addr, uint8_t reg, uint8_t &value)
+{
+  Wire.beginTransmission(addr);
+  Wire.write(reg);
+  if (Wire.endTransmission(false) != 0) return false; // repeated-start
+  if (Wire.requestFrom(addr, (uint8_t)1) != 1) return false;
+  value = Wire.read();
+  return true;
+}
+
+static bool i2c_read_u8_stop(uint8_t addr, uint8_t reg, uint8_t &value)
+{
+  Wire.beginTransmission(addr);
+  Wire.write(reg);
+  if (Wire.endTransmission(true) != 0) return false; // stop
+  if (Wire.requestFrom(addr, (uint8_t)1) != 1) return false;
+  value = Wire.read();
+  return true;
+}
+
+static void dump_reg(uint8_t addr, uint8_t reg)
+{
+  uint8_t v1=0xAA, v2=0xAA;
+  bool ok1 = i2c_read_u8_rs(addr, reg, v1);
+  bool ok2 = i2c_read_u8_stop(addr, reg, v2);
+
+  Serial.printf("[0x%02X] reg 0x%02X  RS:%s 0x%02X  STOP:%s 0x%02X\n",
+                addr, reg,
+                ok1 ? "OK " : "FAIL", v1,
+                ok2 ? "OK " : "FAIL", v2);
+}
+
+static bool i2c_write_u8(uint8_t addr, uint8_t reg, uint8_t value)
+{
+  Wire.beginTransmission(addr);
+  Wire.write(reg);
+  Wire.write(value);
+  return (Wire.endTransmission(true) == 0);
+}
+
+void probe_bmm150_like(uint8_t addr)
+{
+  Serial.println("=== BMM150-ish probe @0x10 ===");
+
+  // Dump some candidate ID / status regs
+  dump_reg(addr, 0x40); // BMM150 chip-id (expected 0x32)
+  dump_reg(addr, 0x41); // often used as a follow-up sanity check on BMM150
+  dump_reg(addr, 0x4B); // power control on BMM150
+  dump_reg(addr, 0x4C); // opmode on BMM150
+
+  // Try "power on" (BMM150: set bit0 in 0x4B)
+  Serial.println("Trying power control: write 0x01 to reg 0x4B ...");
+  bool w = i2c_write_u8(addr, 0x4B, 0x01);
+  Serial.printf("write: %s\n", w ? "OK" : "FAIL");
+  delay(10);
+
+  // Re-read chip id after power-up attempt
+  dump_reg(addr, 0x40);
+
+  Serial.println("=============================");
+}
+
+
+
 
 void setup() {
   Serial.begin(115200);
@@ -44,6 +160,12 @@ void setup() {
   scan.i2c_ok = init.i2c_ok;
   scan.spi_ok = init.spi_ok;
   board_print_report(scan);
+
+  // temp - delete when done
+  //delay(100);
+  //probe_bmm150_like(0x10);
+  //delay(100);
+  //probe_i2c_devices();
 
   // Init timing stats
   fast_stats.reset();
@@ -94,5 +216,6 @@ void loop() {
   }
   
   // Avoid starving Wi-Fi/RTOS housekeeping in future; safe to yield here.
-  delay(1);
+  //delay(1);
+  //delayMicroseconds(10);
 }

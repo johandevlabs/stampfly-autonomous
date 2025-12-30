@@ -10,6 +10,9 @@
 #include "sensors/flow/flow_pmw3901.h"
 #include "sensors/tof/tof_vl53l3.h"
 #include "sensors/power/power_ina3221.h"
+#include "sensors/pres/pres_bmp280.h"
+#include "sensors/mag/mag_bmm150.h"
+
 
 struct SensorsSample {
   // Timestamps for when each rate-group last updated
@@ -37,6 +40,14 @@ struct SensorsSample {
   bool power_valid = false;
   PowerSample power{};
   uint32_t power_err = 0;
+
+  // Pressure
+  bool pres_valid = false;
+  PresSample pres{};
+
+  // Magnetometer
+  bool mag_valid = false;
+  MagSample mag{};
 };
 
 class Sensors {
@@ -60,8 +71,9 @@ private:
   FlowPmw3901 _flow;
   TofVl53L3 _tof_down;
   TofVl53L3 _tof_front;          // optional future
-
   PowerINA3221 _power;
+  PresBmp280 _pres;
+  MagBmm150 _mag;
 
   // ToF pins (constructed from your pin defines)
   TofPins _downPins{PIN_TOF1_XSHUT, PIN_TOF1_GPIO1};

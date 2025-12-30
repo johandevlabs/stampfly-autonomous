@@ -38,6 +38,16 @@ bool Sensors::begin(TwoWire& wire) {
   Serial.printf("[sensors][power] INA3221: %s\n", power_ok ? "OK" : "FAIL");
   if (!power_ok) ok = false;
 
+  // Pressure (BMP280)
+  bool pres_ok = _pres.begin(wire, 0x76);
+  Serial.printf("[sensors][pres]  BMP280: %s\n", pres_ok ? "OK" : "FAIL");
+  if (!pres_ok) ok = false;
+
+  // Magnetometer (BMM150)
+  bool mag_ok = _mag.begin(wire, 0x10);
+  Serial.printf("[sensors][mag]   BMM150: %s\n", mag_ok ? "OK" : "FAIL");
+  if (!mag_ok) ok = false;
+
   Serial.printf("[sensors] begin result: %s\n", ok ? "OK" : "FAIL");
   return ok;
 }
@@ -79,10 +89,22 @@ void Sensors::very_slow_read() {
   _s.t_very_slow_ms = millis();
 
   // Power
-  PowerSample p = _power.read();
-  _s.power = p;
-  _s.power_valid = p.valid;
+  PowerSample power_s = _power.read();
+  _s.power = power_s;
+  _s.power_valid = power_s.valid;
   _s.power_err = _power.errorCount();
+
+  // Pressure
+  PresSample pres_s;
+  _pres.read(pres_s);
+  _s.pres = pres_s;
+  _s.pres_valid = pres_s.valid;
+
+  // Magnetometer
+  MagSample mag_s;
+  _mag.read(mag_s);
+  _s.mag = mag_s;
+  _s.mag_valid = mag_s.valid;
 }
 
 void Sensors::printSample() const {
@@ -114,8 +136,7 @@ void Sensors::printSample() const {
     if (ts.stale) {
       Serial.printf("%s=%u mm* ", name, ts.range_mm);
     } else {
-      Serial.printf("%s=%u mm (st=%u) ", name,
-                    ts.range_mm, ts.range_status);
+      Serial.printf("%s=%u mm (st=%u) ", name, ts.range_mm, ts.range_status);
     }
   };
 
@@ -125,12 +146,25 @@ void Sensors::printSample() const {
 
   // Power
   if (!_s.power_valid) {
-    Serial.printf("[power] INVALID (err=%lu)\n",
-                  (unsigned long)_s.power_err);
+    Serial.printf("[power] INVALID (err=%lu)\n", (unsigned long)_s.power_err);
   } else {
     Serial.printf("[power] VBAT_IN=%.3f V  I=%.3f A  P=%.3f W\n",
-                  _s.power.vbat_in_v,
-                  _s.power.ishunt_a,
-                  _s.power.p_w);
+                  _s.power.vbat_in_v, _s.power.ishunt_a, _s.power.p_w);
   }
+
+    // Pressure
+  if (_s.pres_valid) {
+    Serial.printf("[pres] T=%.2f C  P=%.1f Pa\n", _s.pres.temp_c, _s.pres.press_pa);
+  } else {
+    Serial.println("[pres] --");
+  }
+
+  // Magnetometer
+  if (_s.mag_valid) {
+    Serial.printf("[mag] raw x=%d y=%d z=%d (id=0x%02X)\n",
+                  _s.mag.x, _s.mag.y, _s.mag.z, _s.mag.chip_id);
+  } else {
+    Serial.println("[mag] --");
+  }
+
 }
