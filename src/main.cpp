@@ -15,7 +15,7 @@
 // Phase 0 loop targets
 static constexpr uint32_t FAST_HZ = 250;   // e.g. IMU later
 static constexpr uint32_t SLOW_HZ = 20;    // e.g. ToF later
-static constexpr uint32_t REPORT_HZ = 1;
+static constexpr uint32_t REPORT_HZ = 1;   // Report telemetry, and measure power
 
 static constexpr uint32_t FAST_PERIOD_US   = 1000000UL / FAST_HZ;
 static constexpr uint32_t SLOW_PERIOD_US   = 1000000UL / SLOW_HZ;
